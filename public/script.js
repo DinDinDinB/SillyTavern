@@ -3081,8 +3081,46 @@ function restoreResponseLength(api, responseLength) {
  * @returns {Promise<any>} Returns a promise that resolves when the text is done generating.
  * @typedef {{automatic_trigger?: boolean, force_name2?: boolean, quiet_prompt?: string, quietToLoud?: boolean, skipWIAN?: boolean, force_chid?: number, signal?: AbortSignal, quietImage?: string, maxLoops?: number, quietName?: string }} GenerateOptions
  */
+let lastCutoff=-1; //new global variable for custom token cache shifting
 export async function Generate(type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, maxLoops, quietName } = {}, dryRun = false) {
     console.log('Generate entered');
+
+    //custom token cache shifting begin - by u/brucebay
+    let msgPos=chat2.length; //new local variable
+
+    for (let item of chat2) {
+    
+    msgPos--; // index of item in the message list
+    
+    // not needed for OAI prompting
+    
+    if (lastCutoff==msgPos) //if we are at the cutoff position stop
+    
+    break;
+    
+    if (main_api == 'openai')
+    
+    {break;}
+    
+    tokenCount += getTokenCount(item.replace(/\r/gm, ''))
+    
+    chatString = item + chatString;
+    
+    if (tokenCount < this_max_context)
+    
+    {
+    
+    arrMes[arrMes.length] = item;
+    
+    } else { //if we reached max contex length adjust the cut off position as ~ half of the context size
+    
+    lastCutoff=(chat2.length+msgPos)/2; //set new cutoff at the middle
+    
+    console.log("Putting a new cutoff:"+item+" "+lastCutoff+" "+msgPos)
+    
+    break;}
+    //custom token cache shifting End
+    
     eventSource.emit(event_types.GENERATION_STARTED, type, { automatic_trigger, force_name2, quiet_prompt, quietToLoud, skipWIAN, force_chid, signal, quietImage, maxLoops }, dryRun);
     setGenerationProgress(0);
     generation_started = new Date();
